@@ -43,7 +43,7 @@ static bool init = false;
 
 bool dscapture_init() {
     if(libusb_init(NULL) != LIBUSB_SUCCESS) {
-        printf("libusb_init() error\n");
+        printf("Could not initialize lib usb.\n");
         return false;
     }
         
@@ -51,7 +51,7 @@ bool dscapture_init() {
 
     dev = libusb_open_device_with_vid_pid(NULL, USBDS_VID, USBDS_PID);
     if(!dev) {
-        printf("Could not open device\n");
+        printf("Could not open device.\n");
         goto err;
     }
     
@@ -168,38 +168,52 @@ static void BGR16toRGB24(uint8_t *out, uint16_t *in) {
 }
 
 int main(int argc, char **argv) {
+	if(argc != 4) {
+		printf("Usage: %s width height screens\n", argv[0]);
+		printf("Example: %s 800 600 2\n", argv[0]);
+		return 0;
+	}
+	
+	int width = atoi(argv[1]);
+	int height = atoi(argv[2]);
+	int screens = atoi(argv[3]);
+	
+	if(screens != 1 && screens != 2) {
+		screens = 1; // default
+	}
+	
     if(SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("Could not initialize SDL\n");
+        printf("Could not initialize SDL.\n");
         goto end;
     }
     
     SDL_Window *window = SDL_CreateWindow("DS Stream",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        1152, 864,
+        width, height,
         SDL_WINDOW_RESIZABLE);
         
     if(!window) {
-        printf("Could not create window\n");
+        printf("Could not create window.\n");
         goto end;
     }
     
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, 0);
     
     if(!renderer) {
-        printf("Could not create renderer\n");
+        printf("Could not create renderer.\n");
         goto end;
     }
     
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24,
-        SDL_TEXTUREACCESS_STREAMING, 256, 192);
+        SDL_TEXTUREACCESS_STREAMING, 256, 192 * screens);
 
     if(!texture) {
-        printf("Could not create streaming texture\n");
+        printf("Could not create streaming texture.\n");
         goto end;
     }
 
     if(!dscapture_init()) {
-        printf("dscapture_init() error\n");
+        printf("Could not initialize DS capture card.\n");
         goto end;
     }
     
@@ -207,7 +221,7 @@ int main(int argc, char **argv) {
     int pitch;
     bool done = false;
     
-    SDL_RenderSetLogicalSize(renderer, 1152, 864);
+    SDL_RenderSetLogicalSize(renderer, width, height);
     
     while(!done) {
         SDL_Event event;
@@ -225,13 +239,13 @@ int main(int argc, char **argv) {
         }
             
         if(SDL_LockTexture(texture, NULL, &pixels, &pitch) < 0) {
-            printf("Could not lock texture\n");
+            printf("Could not lock texture.\n");
             break;
         }
         
         dscapture_grabFrame(buf16);
         BGR16toRGB24(buf24, buf16);
-        SDL_memcpy(pixels, buf24, 256 * 192 * 3);
+        SDL_memcpy(pixels, buf24, 256 * 192 * 3 * screens);
         SDL_UnlockTexture(texture);
         
         SDL_RenderClear(renderer);
@@ -244,4 +258,3 @@ end:
     SDL_DestroyRenderer(renderer);
     return 0;
 }
-
